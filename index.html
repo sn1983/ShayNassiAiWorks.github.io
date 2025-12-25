@@ -1,33 +1,137 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shay Nassi - AI Portfolio</title>
-    <style>
-        body { font-family: sans-serif; background: #111; color: white; text-align: center; padding: 20px; }
-        .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; max-width: 1200px; margin: 0 auto; }
-        .gallery img { width: 100%; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        h1 { color: #00d4ff; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gallery - ShayNassiAiWorks</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;padding:1rem;background:#fafafa;color:#111}
+    h1{margin:0 0 1rem}
+    .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .item{background:#fff;border:1px solid #eee;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:96px}
+    .item img{max-width:100%;max-height:160px;object-fit:cover;cursor:pointer;display:block}
+    .meta{font-size:12px;color:#666;margin-top:6px;text-align:center}
+    .center{max-width:1100px;margin:0 auto}
+    .loader{margin:2rem auto;text-align:center;color:#555}
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000;visibility:hidden;opacity:0;transition:opacity .2s}
+    .modal.open{visibility:visible;opacity:1}
+    .modal img{max-width:calc(100% - 40px);max-height:calc(100% - 40px);box-shadow:0 10px 40px rgba(0,0,0,.6);border-radius:6px}
+    .close{position:fixed;right:20px;top:20px;color:#fff;font-size:28px;cursor:pointer}
+    .empty{color:#777;padding:2rem;text-align:center}
+    a.rawlink{display:inline-block;margin-top:8px;color:#1a73e8;font-size:13px}
+  </style>
 </head>
 <body>
-    <h1>Shay Nassi - AI Works</h1>
-    <div class="gallery">
-        <img src="_a_futuristic_medical_capsule_in_a_clean_and_modern_laborato_f98c4078-43e7-4933-9f5a-3eb0414f4e2f.png" alt="AI Work">
-        <img src="_a_realistic_and_detailed_cinematic_close-up_of_a_futuristi_2595679e-436f-4091-a67b-167812260682.png" alt="AI Work">
-        <img src="_a_realistic_and_detailed_cinematic_close-up_of_a_futuristi_5f3088d8-e705-470a-814a-f2b34714e820.png" alt="AI Work">
-        <img src="_a_realistic_and_detailed_cinematic_close-up_of_a_futuristi_8df54f15-776a-4efb-86d1-0f7308728d11.png" alt="AI Work">
-        <img src="_a_realistic_and_detailed_cinematic_close-up_of_a_futuristi_a8019313-9a3d-4e92-bc9a-65985863c332.png" alt="AI Work">
-        <img src="_a_realistic_and_detailed_cinematic_close-up_of_a_futuristi_f34d707c-9b8e-490f-9031-6e5450849c71.png" alt="AI Work">
-        <img src="_a_realistic_detailed_cinematic_shot_of_a_futuristic_medic_4c9735d4-4a4f-4d6f-87d2-749446d3f27f.png" alt="AI Work">
-        <img src="_a_realistic_detailed_cinematic_shot_of_a_futuristic_medic_6d20f269-e77a-4df4-a3f1-432822a16c14.png" alt="AI Work">
-        <img src="_a_realistic_detailed_cinematic_shot_of_a_futuristic_medic_82643a0e-a616-4318-ae71-209a3410787d.png" alt="AI Work">
-        <img src="_a_realistic_detailed_cinematic_shot_of_a_futuristic_medic_f654b42b-658b-4b68-ba33-898492025219.png" alt="AI Work">
-        <img src="_an_extremely_detailed_and_realistic_cinematic_close-up_of_a_5f096767-1725-4c0d-b4bc-da38622c9e78.png" alt="AI Work">
-        <img src="_an_extremely_detailed_and_realistic_cinematic_close-up_of_a_8d4889d8-9df2-436b-9c60-a4f6645366c8.png" alt="AI Work">
-        <img src="_an_extremely_detailed_and_realistic_cinematic_close-up_of_a_b402ef49-74d1-447a-8df6-91e845c43232.png" alt="AI Work">
-        <img src="_an_extremely_detailed_and_realistic_cinematic_close-up_of_a_f503e911-3091-443b-81f1-ef28e469502b.png" alt="AI Work">
-    </div>
+  <div class="center">
+    <h1>גלריית תמונות — ShayNassiAiWorks</h1>
+    <div id="loader" class="loader">מטעין קבצים מהמאגר...</div>
+    <div id="gallery" class="gallery" aria-live="polite"></div>
+    <div id="empty" class="empty" style="display:none">לא נמצאו קבצי תמונה במאגר.</div>
+  </div>
+
+  <div id="modal" class="modal" role="dialog" aria-hidden="true">
+    <span id="closeBtn" class="close" title="סגור">✕</span>
+    <img id="modalImg" src="" alt="">
+  </div>
+
+  <script>
+    (function(){
+      const owner = 'sn1983';
+      const repo = 'ShayNassiAiWorks.github.io';
+      const branch = 'main'; // change if your default branch is different
+      const galleryEl = document.getElementById('gallery');
+      const loader = document.getElementById('loader');
+      const empty = document.getElementById('empty');
+      const modal = document.getElementById('modal');
+      const modalImg = document.getElementById('modalImg');
+      const closeBtn = document.getElementById('closeBtn');
+
+      function rawUrl(path){
+        // encode path components
+        return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURI(path)}`;
+      }
+
+      // image file extensions to include
+      const imgRE = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+      async function listContents(path = ''){
+        const api = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+        const res = await fetch(api);
+        if(!res.ok) throw new Error('Failed to fetch contents: ' + res.status);
+        return res.json();
+      }
+
+      async function gatherImages(path = ''){
+        const items = await listContents(path);
+        let images = [];
+        // items can be a single object or array
+        const list = Array.isArray(items) ? items : [items];
+        for(const it of list){
+          if(it.type === 'file' && imgRE.test(it.name)){
+            images.push({name: it.path, url: rawUrl(it.path), size: it.size});
+          } else if(it.type === 'dir'){
+            // recurse into directory
+            const nested = await gatherImages(it.path);
+            images = images.concat(nested);
+          }
+        }
+        return images;
+      }
+
+      function makeItem(img){
+        const wrap = document.createElement('div');
+        wrap.className = 'item';
+        const image = document.createElement('img');
+        image.src = img.url;
+        image.alt = img.name;
+        image.loading = 'lazy';
+        image.title = img.name;
+        image.addEventListener('click', ()=> openModal(img));
+        wrap.appendChild(image);
+        return wrap;
+      }
+
+      function openModal(img){
+        modalImg.src = img.url;
+        modalImg.alt = img.name;
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden','false');
+      }
+
+      function closeModal(){
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden','true');
+        modalImg.src = '';
+      }
+
+      closeBtn.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e)=>{ if(e.target === modal) closeModal(); });
+      document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal(); });
+
+      async function init(){
+        try{
+          loader.textContent = 'מוצא קבצים...';
+          const images = await gatherImages('');
+          loader.style.display = 'none';
+          if(images.length === 0){ empty.style.display = 'block'; return; }
+
+          // sort by name
+          images.sort((a,b)=> a.name.localeCompare(b.name, 'he'));
+
+          for(const img of images){
+            const el = makeItem(img);
+            galleryEl.appendChild(el);
+          }
+        }catch(err){
+          loader.textContent = 'שגיאה בקריאת המאגר: ' + err.message;
+          console.error(err);
+        }
+      }
+
+      // Start
+      init();
+    })();
+  </script>
 </body>
 </html>
