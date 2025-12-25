@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Shay Nassi | AI Art Gallery</title>
+  <title>Gallery - ShayNassiAiWorks</title>
   <style>
     /* הגדרות כלליות */
     :root {
@@ -155,16 +155,11 @@
   </style>
 </head>
 <body>
-
   <div class="center">
-    <header>
-      <h1>Shay Nassi AiWorks</h1>
-      <p style="color: var(--text-secondary)">בינה מלאכותית פוגשת דמיון</p>
-    </header>
-
-    <div id="loader" class="loader">Tuning the AI engines...</div>
+    <h1> Shay Nassi AiWorks- גלריית תמונות</h1>
+    <div id="loader" class="loader">מטעין קבצים מהמאגר...</div>
     <div id="gallery" class="gallery" aria-live="polite"></div>
-    <div id="empty" class="empty" style="display:none">לא נמצאו יצירות בגלריה כרגע.</div>
+    <div id="empty" class="empty" style="display:none">לא נמצאו קבצי תמונה במאגר.</div>
   </div>
 
   <div id="modal" class="modal" role="dialog" aria-hidden="true">
@@ -173,11 +168,10 @@
   </div>
 
   <script>
-    /* הפונקציונאליות המקורית שלך נשמרת ללא שינוי */
     (function(){
       const owner = 'sn1983';
       const repo = 'ShayNassiAiWorks.github.io';
-      const branch = 'main';
+      const branch = 'main'; // change if your default branch is different
       const galleryEl = document.getElementById('gallery');
       const loader = document.getElementById('loader');
       const empty = document.getElementById('empty');
@@ -186,9 +180,11 @@
       const closeBtn = document.getElementById('closeBtn');
 
       function rawUrl(path){
+        // encode path components
         return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURI(path)}`;
       }
 
+      // image file extensions to include
       const imgRE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
       async function listContents(path = ''){
@@ -201,11 +197,13 @@
       async function gatherImages(path = ''){
         const items = await listContents(path);
         let images = [];
+        // items can be a single object or array
         const list = Array.isArray(items) ? items : [items];
         for(const it of list){
           if(it.type === 'file' && imgRE.test(it.name)){
             images.push({name: it.path, url: rawUrl(it.path), size: it.size});
           } else if(it.type === 'dir'){
+            // recurse into directory
             const nested = await gatherImages(it.path);
             images = images.concat(nested);
           }
@@ -220,5 +218,52 @@
         image.src = img.url;
         image.alt = img.name;
         image.loading = 'lazy';
+        image.title = img.name;
         image.addEventListener('click', ()=> openModal(img));
-        wrap.appendChild
+        wrap.appendChild(image);
+        return wrap;
+      }
+
+      function openModal(img){
+        modalImg.src = img.url;
+        modalImg.alt = img.name;
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden','false');
+      }
+
+      function closeModal(){
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden','true');
+        modalImg.src = '';
+      }
+
+      closeBtn.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e)=>{ if(e.target === modal) closeModal(); });
+      document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal(); });
+
+      async function init(){
+        try{
+          loader.textContent = 'מוצא קבצים...';
+          const images = await gatherImages('');
+          loader.style.display = 'none';
+          if(images.length === 0){ empty.style.display = 'block'; return; }
+
+          // sort by name
+          images.sort((a,b)=> a.name.localeCompare(b.name, 'he'));
+
+          for(const img of images){
+            const el = makeItem(img);
+            galleryEl.appendChild(el);
+          }
+        }catch(err){
+          loader.textContent = 'שגיאה בקריאת המאגר: ' + err.message;
+          console.error(err);
+        }
+      }
+
+      // Start
+      init();
+    })();
+  </script>
+</body>
+</html>
