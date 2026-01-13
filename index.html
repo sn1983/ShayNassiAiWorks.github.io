@@ -1,47 +1,268 @@
-(function(){
-  const owner = 'sn1983';
-  const repo = 'ShayNassiAiWorks.github.io';
-  const branch = 'main';
-  
-  // שימוש ב-jsDelivr במקום ב-GitHub Raw לצורך הזרמת וידאו תקינה
-  function getFileUrl(path) {
-    return `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${branch}/${encodeURI(path)}`;
-  }
-
-  const imgRE = /\.(png|jpe?g|gif|webp|svg)$/i;
-  const vidRE = /\.(mp4|webm|ogg|mov)$/i;
-
-  async function listContents(path = ''){
-    const api = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
-    const res = await fetch(api);
-    if(!res.ok) throw new Error('API Error: ' + res.status);
-    return res.json();
-  }
-
-  async function gatherFiles(path = ''){
-    const items = await listContents(path);
-    let files = [];
-    const list = Array.isArray(items) ? items : [items];
-    
-    for(const it of list){
-      if(it.type === 'file'){
-        const isImg = imgRE.test(it.name);
-        const isVid = vidRE.test(it.name);
-        if(isImg || isVid){
-          files.push({
-            name: it.path, 
-            url: getFileUrl(it.path), // הכתובת החדשה
-            type: isImg ? 'image' : 'video'
-          });
-        }
-      } else if(it.type === 'dir'){
-        files = files.concat(await gatherFiles(it.path));
-      }
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gallery - ShayNassiAiWorks</title>
+  <style>
+    :root {
+      --bg-color: #0a0a0a;
+      --card-bg: #161616;
+      --accent-color: #00d4ff;
+      --text-main: #ffffff;
+      --text-secondary: #a0a0a0;
+      --grid-size: 240px; /* הקטנתי מעט את גודל הריבועים */
     }
-    return files;
-  }
 
-  // שאר הפונקציות (makeItem, openModal, closeModal) נשארות כפי שהיו בגרסה הקודמת
-  // חשוב לוודא שב-makeItem עבור וידאו יש:
-  // media.preload = "metadata";
-})();
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      background: var(--bg-color);
+      color: var(--text-main);
+      overflow-x: hidden;
+    }
+
+    .center { max-width: 1400px; margin: 0 auto; padding: 40px 20px; }
+    
+    h1 { 
+      text-align: center; 
+      font-size: 2.2rem; 
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #fff, var(--accent-color));
+      -webkit-background-clip: text; 
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      font-size: 0.9rem;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--grid-size), 1fr));
+      gap: 20px;
+    }
+
+    .item {
+      background: var(--card-bg);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 1 / 1;
+      border: 1px solid #222;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .item:hover {
+      transform: scale(1.03);
+      border-color: var(--accent-color);
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    }
+
+    /* התאמת המדיה לריבוע */
+    .item img, .item video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* זה מבטיח שהתמונה תמלא את הריבוע בלי להתעוות */
+      display: block;
+    }
+
+    /* שכבת אינדיקציה במעבר עכבר */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      color: white;
+      text-align: center;
+      font-size: 0.85rem;
+      padding: 10px;
+    }
+
+    .item:hover .overlay {
+      opacity: 1;
+    }
+
+    .overlay i {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+
+    /* סמל וידאו קבוע בפינה */
+    .video-tag {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      color: var(--accent-color);
+      z-index: 2;
+    }
+
+    .loader { text-align: center; padding: 100px; color: var(--accent-color); font-weight: bold; }
+
+    /* מודל */
+    .modal {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
+      backdrop-filter: blur(10px); display: none;
+      align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal.open { display: flex; }
+    .modal-content { max-width: 90%; max-height: 90vh; position: relative; }
+    .modal img, .modal video { width: 100%; height: auto; max-height: 85vh; border-radius: 8px; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+
+    .close {
+      position: absolute; right: -40px; top: -40px;
+      color: #fff; font-size: 35px; cursor: pointer; transition: 0.2s;
+    }
+    .close:hover { color: var(--accent-color); }
+
+    @media (max-width: 600px) {
+      :root { var(--grid-size): 150px; }
+      .close { right: 0; top: -45px; }
+      h1 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="center">
+    <h1>Shay Nassi AiWorks - גלריה</h1>
+    <p class="subtitle">לחצו על תמונה להגדלה או על סרטון לצפייה</p>
+    
+    <div id="loader" class="loader">טוען יצירות...</div>
+    <div id="gallery" class="gallery"></div>
+    <div id="empty" class="empty" style="display:none; text-align:center;">לא נמצאו קבצים במאגר.</div>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+        <span id="closeBtn" class="close">✕</span>
+        <img id="modalImg" style="display:none">
+        <video id="modalVideo" controls style="display:none"></video>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const owner = 'sn1983';
+      const repo = 'ShayNassiAiWorks.github.io';
+      const branch = 'main';
+      
+      const imgRE = /\.(png|jpe?g|gif|webp|svg)$/i;
+      const vidRE = /\.(mp4|webm|ogg|mov)$/i;
+
+      // שימוש ב-CDN לטעינה מהירה והזרמת וידאו
+      function getFileUrl(path) {
+        return `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${branch}/${encodeURI(path)}`;
+      }
+
+      async function listContents(path = ''){
+        const api = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+        const res = await fetch(api);
+        return res.json();
+      }
+
+      async function gatherFiles(path = ''){
+        const items = await listContents(path);
+        let files = [];
+        const list = Array.isArray(items) ? items : [items];
+        
+        for(const it of list){
+          if(it.type === 'file'){
+            if(imgRE.test(it.name)) files.push({ name: it.path, url: getFileUrl(it.path), type: 'image' });
+            else if(vidRE.test(it.name)) files.push({ name: it.path, url: getFileUrl(it.path), type: 'video' });
+          } else if(it.type === 'dir'){
+            files = files.concat(await gatherFiles(it.path));
+          }
+        }
+        return files;
+      }
+
+      function makeItem(file){
+        const wrap = document.createElement('div');
+        wrap.className = 'item';
+        
+        // תגית "וידאו" קטנה
+        if(file.type === 'video'){
+            const tag = document.createElement('span');
+            tag.className = 'video-tag';
+            tag.textContent = 'VIDEO';
+            wrap.appendChild(tag);
+        }
+
+        const media = file.type === 'image' ? document.createElement('img') : document.createElement('video');
+        media.src = file.type === 'image' ? file.url : file.url + "#t=0.5";
+        if(file.type === 'video') { media.muted = true; media.playsInline = true; }
+        else { media.loading = 'lazy'; }
+        
+        // יצירת ה-Overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.innerHTML = file.type === 'image' ? '<span>🔍 לחץ להגדלה</span>' : '<span>▶ לחץ לצפייה</span>';
+
+        wrap.appendChild(media);
+        wrap.appendChild(overlay);
+        wrap.onclick = () => openModal(file);
+        return wrap;
+      }
+
+      function openModal(file){
+        const modal = document.getElementById('modal');
+        const mImg = document.getElementById('modalImg');
+        const mVid = document.getElementById('modalVideo');
+
+        mImg.style.display = 'none';
+        mVid.style.display = 'none';
+        mVid.pause();
+
+        if(file.type === 'image'){
+            mImg.src = file.url;
+            mImg.style.display = 'block';
+        } else {
+            mVid.src = file.url;
+            mVid.style.display = 'block';
+            mVid.play();
+        }
+        modal.classList.add('open');
+      }
+
+      function closeModal(){
+        const modal = document.getElementById('modal');
+        document.getElementById('modalVideo').pause();
+        modal.classList.remove('open');
+      }
+
+      document.getElementById('closeBtn').onclick = closeModal;
+      window.onclick = (e) => { if(e.target.id === 'modal') closeModal(); };
+
+      async function init(){
+        try {
+          const files = await gatherFiles('');
+          document.getElementById('loader').style.display = 'none';
+          if(!files.length) { document.getElementById('empty').style.display = 'block'; return; }
+          
+          files.sort((a,b) => a.name.localeCompare(b.name));
+          const gallery = document.getElementById('gallery');
+          files.forEach(f => gallery.appendChild(makeItem(f)));
+        } catch(e) { 
+          document.getElementById('loader').textContent = 'שגיאה בתקשורת עם GitHub';
+        }
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
